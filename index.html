@@ -97,6 +97,9 @@ td.code{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--acc);f
 .bucket-hot{background:var(--grn-b);color:var(--grn);font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
 .bucket-warm{background:var(--amb-b);color:var(--amb);font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px}
+/* Growth table column dividers */
+#tab-growth table td, #tab-growth table th{border-right:1px solid rgba(0,0,0,0.06)}
+#tab-growth table td:last-child, #tab-growth table th:last-child{border-right:none}
 .row-selected{background:var(--acc-l)!important}
 .row-selected:hover{background:#e0e7ff!important}
 .sel-cb{width:13px;height:13px;cursor:pointer;accent-color:var(--acc)}
@@ -1084,7 +1087,7 @@ function growthRow(r,isBase,baseRow){
   const cpiCell=`<td class="num ${cpiCls(r.cpi)}" style="line-height:1.3">${cpiVal}${cpiDelta}</td>`;
 
   // CTR×CTI cell with delta on new line
-  let ctrVal=r.ctr_cti!=null?r.ctr_cti.toFixed(2)+'%':'—';
+  let ctrVal=r.ctr_cti!=null?(r.ctr_cti*100).toFixed(2)+'%':'—';
   let ctrDelta='';
   if(!isBase&&baseRow&&r.ctr_cti!=null){
     const d=r.ctr_cti-baseRow.ctr_cti;
