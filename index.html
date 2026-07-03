@@ -1243,77 +1243,114 @@ function renderTrackInsights(){
         r[1].u4+' under $4 of '+r[1].total+' experiments', rCol);
   }
 
-  // ── Track 2: Best Recovery ───────────────────────────────────────────
+  // ── Track 2: Best Recovery (combo-aware, from cohort data) ───────────
   const t2el=document.getElementById('track2-insight');
   if(t2el){
-    const tropes2=PERF.tropes.filter(function(t){return t.total_cost>0;});
-    // Sort by recovery
-    const byRec=tropes2.slice().sort(function(a,b){return b.total_recovery_pct-a.total_recovery_pct;});
-    // Sort by spend (confidence proxy)
-    const byConf=tropes2.slice().sort(function(a,b){return b.total_cost-a.total_cost;});
-    var bestRec=byRec[0];
-    var highConf=byConf[0];
-    // Confidence label for bestRec
-    var spendRank=byConf.findIndex(function(t){return t.trope===bestRec.trope;});
-    var confLabel=spendRank===0?'Highest spend — high confidence':
-                  spendRank===1?'2nd highest spend — moderate confidence':
-                  'Low spend ($'+Math.round(bestRec.total_cost/1000)+'K) — limited confidence';
-    function mkTrack2Card(label,trope,stat,note,sub,color){
-      return '<div style="flex:1;background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;border-left:3px solid '+color+'">'
-        +'<div style="font-size:8px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">'+label+'</div>'
-        +'<div style="font-size:15px;font-weight:700;color:'+color+'">'+trope+'</div>'
-        +'<div style="font-size:12px;font-weight:600;color:var(--txt);margin-top:1px">'+stat+'</div>'
-        +'<div style="font-size:10px;color:var(--txt3);margin-top:2px">'+note+'</div>'
-        +'<div style="font-size:9px;margin-top:4px;padding:2px 7px;border-radius:20px;display:inline-block;background:var(--surf2);color:var(--txt3)">'+sub+'</div>'
-        +'</div>';
-    }
-    var bestRecCol=TROPE_COLORS_MAP[bestRec.trope]||'#14532d';
-    var highConfCol=TROPE_COLORS_MAP[highConf.trope]||'#1d4ed8';
-    var t2html=mkTrack2Card('🏆 Best Recovery %',bestRec.trope,
-      (bestRec.total_recovery_pct*100).toFixed(1)+'% recovery',
-      bestRec.asset_count+' assets · $'+Math.round(bestRec.total_cost/1000)+'K spend',
-      confLabel, bestRecCol);
-    // Only show high confidence separately if it's different from bestRec
-    if(highConf.trope!==bestRec.trope){
-      t2html+=mkTrack2Card('💪 Highest Confidence (most spend)',highConf.trope,
-        (highConf.total_recovery_pct*100).toFixed(1)+'% recovery',
-        highConf.asset_count+' assets · $'+Math.round(highConf.total_cost/1000)+'K spend',
-        'Most budget deployed — most reliable signal', highConfCol);
+    const combo=window._tropeScript||'all';
+    const canvasCombos=combo==='all'?['v7sci','v7sab','luna']:[combo];
+    const CD=TROPE_COHORT_DATA.cohort;
+    // Build per-trope recovery + spend for the selected combo
+    var rows=[];
+    Object.keys(CD).forEach(function(trope){
+      if(trope==='Production Base')return;
+      var combos=CD[trope];
+      var totSpend=0, wrec=0, nass=0, haveRec=false;
+      canvasCombos.forEach(function(c){
+        var d=combos[c];
+        if(!d)return;
+        var sp=d.total_spend||0;
+        var rec=d.cohort&&d.cohort.D30?d.cohort.D30.recovery:null;
+        if(rec!=null&&sp>0){wrec+=rec*sp; totSpend+=sp; haveRec=true;}
+        else if(rec!=null&&sp===0){wrec+=rec; totSpend+=1; haveRec=true;}
+        nass+=d.n_assets||0;
+      });
+      if(haveRec&&totSpend>0){
+        rows.push({trope:trope, rec:wrec/totSpend, spend:totSpend, assets:nass});
+      }
+    });
+    if(!rows.length){
+      t2el.innerHTML='<div style="color:var(--txt3);font-size:11px;padding:12px">No scaled recovery data for this script/canvas.</div>';
     } else {
-      // Both same trope — show 2nd best recovery instead
-      if(byRec.length>1){
+      var byRec=rows.slice().sort(function(a,b){return b.rec-a.rec;});
+      var byConf=rows.slice().sort(function(a,b){return b.spend-a.spend;});
+      var bestRec=byRec[0];
+      var highConf=byConf[0];
+      var spendRank=byConf.findIndex(function(t){return t.trope===bestRec.trope;});
+      var confLabel=spendRank===0?'Highest spend — high confidence':
+                    spendRank===1?'2nd highest spend — moderate confidence':
+                    'Lower spend ($'+Math.round(bestRec.spend/1000)+'K) — limited confidence';
+      function mkTrack2Card(label,trope,stat,note,sub,color){
+        return '<div style="flex:1;background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;border-left:3px solid '+color+'">'
+          +'<div style="font-size:8px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">'+label+'</div>'
+          +'<div style="font-size:15px;font-weight:700;color:'+color+'">'+trope+'</div>'
+          +'<div style="font-size:12px;font-weight:600;color:var(--txt);margin-top:1px">'+stat+'</div>'
+          +'<div style="font-size:10px;color:var(--txt3);margin-top:2px">'+note+'</div>'
+          +'<div style="font-size:9px;margin-top:4px;padding:2px 7px;border-radius:20px;display:inline-block;background:var(--surf2);color:var(--txt3)">'+sub+'</div>'
+          +'</div>';
+      }
+      var bestRecCol=TROPE_COLORS_MAP[bestRec.trope]||'#14532d';
+      var highConfCol=TROPE_COLORS_MAP[highConf.trope]||'#1d4ed8';
+      var t2html=mkTrack2Card('🏆 Best Recovery %',bestRec.trope,
+        bestRec.rec.toFixed(1)+'% recovery',
+        bestRec.assets+' assets · $'+Math.round(bestRec.spend/1000)+'K spend',
+        confLabel, bestRecCol);
+      if(highConf.trope!==bestRec.trope){
+        t2html+=mkTrack2Card('💪 Highest Confidence (most spend)',highConf.trope,
+          highConf.rec.toFixed(1)+'% recovery',
+          highConf.assets+' assets · $'+Math.round(highConf.spend/1000)+'K spend',
+          'Most budget deployed — most reliable signal', highConfCol);
+      } else if(byRec.length>1){
         var second=byRec[1];
         var secCol=TROPE_COLORS_MAP[second.trope]||'#475569';
         t2html+=mkTrack2Card('🥈 2nd Best Recovery',second.trope,
-          (second.total_recovery_pct*100).toFixed(1)+'% recovery',
-          second.asset_count+' assets · $'+Math.round(second.total_cost/1000)+'K spend',
-          '2nd in recovery, '+byConf.findIndex(function(t){return t.trope===second.trope;})+' in spend rank', secCol);
+          second.rec.toFixed(1)+'% recovery',
+          second.assets+' assets · $'+Math.round(second.spend/1000)+'K spend',
+          'Highest spend also had best recovery', secCol);
       }
+      t2el.innerHTML=t2html;
     }
-    t2el.innerHTML=t2html;
   }
+
 }
 
 function renderTropeCracking(){
   const el=document.getElementById('trope-cracking-grid');
   if(!el)return;
-  const tropes=Object.entries(TROPE_STATS).sort((a,b)=>b[1].u3-a[1].u3);
-  el.innerHTML=tropes.map(([t,s])=>{
+  const s=window._tropeScript||'all';
+  const canvasFor={v7sci:'SciFi',v7sab:'Sabrina',luna:'Luna Audition'};
+  const wantCanvas=canvasFor[s]||null;   // null = all
+
+  // Recompute per-combo totals from each trope's asset list
+  const tropes=Object.entries(TROPE_STATS).map(function(e){
+    const t=e[0], data=e[1];
+    let assets=data.assets||[];
+    if(wantCanvas)assets=assets.filter(function(a){return a.canvas===wantCanvas;});
+    const total=assets.length;
+    const u3=assets.filter(function(a){return a.cpi!=null&&a.cpi<3;}).length;
+    const u4=assets.filter(function(a){return a.cpi!=null&&a.cpi<4;}).length;
+    return [t,{total:total,u3:u3,u4:u4,assets:assets}];
+  }).filter(function(e){return e[1].total>0;})   // hide tropes not tried in this combo
+    .sort(function(a,b){return b[1].u3-a[1].u3||b[1].total-a[1].total;});
+
+  if(!tropes.length){el.innerHTML='<div style="color:var(--txt3);padding:20px;font-size:11px">No experiments for this script/canvas.</div>';return;}
+
+  el.innerHTML=tropes.map(function(pair){
+    const t=pair[0], s2=pair[1];
     const col=TROPE_COLORS_MAP[t]||'#475569';
     const tB64=btoa(unescape(encodeURIComponent(t)));
-    const hitRate=s.total>0?(s.u3/s.total):0;
-    const relRate=s.total>0?(s.u4/s.total):0;
+    const hitRate=s2.total>0?(s2.u3/s2.total):0;
+    const relRate=s2.total>0?(s2.u4/s2.total):0;
     const hitW=Math.round(hitRate*100);
     const relW=Math.round(relRate*100);
     return`<div onclick="openTropeDrill(decodeURIComponent(escape(atob('${tB64}'))),'cracking')" style="background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow=''">
       <div style="height:3px;background:${col};margin:-12px -14px 10px;border-radius:10px 10px 0 0"></div>
       <div style="font-size:11px;font-weight:600;color:var(--txt2);margin-bottom:8px">${t}</div>
-      <div style="font-size:10px;color:var(--txt3);margin-bottom:4px">Experiments: <b style="color:var(--txt)">${s.total}</b></div>
+      <div style="font-size:10px;color:var(--txt3);margin-bottom:4px">Experiments: <b style="color:var(--txt)">${s2.total}</b></div>
 
       <div style="margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;margin-bottom:3px">
           <span style="font-size:9px;font-weight:700;color:#14532d;text-transform:uppercase;letter-spacing:.4px">🎯 Cracking Hitrate</span>
-          <span style="font-size:11px;font-weight:700;color:#14532d">${(hitRate*100).toFixed(0)}% <span style="font-weight:400;font-size:9px;color:var(--txt3)">(${s.u3} under $3)</span></span>
+          <span style="font-size:11px;font-weight:700;color:#14532d">${(hitRate*100).toFixed(0)}% <span style="font-weight:400;font-size:9px;color:var(--txt3)">(${s2.u3} under $3)</span></span>
         </div>
         <div style="height:6px;background:var(--surf3);border-radius:3px;overflow:hidden">
           <div style="width:${hitW}%;height:100%;background:#14532d;border-radius:3px"></div>
@@ -1323,7 +1360,7 @@ function renderTropeCracking(){
       <div>
         <div style="display:flex;justify-content:space-between;margin-bottom:3px">
           <span style="font-size:9px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.4px">📐 Trope-Script Relevance</span>
-          <span style="font-size:11px;font-weight:700;color:#16a34a">${(relRate*100).toFixed(0)}% <span style="font-weight:400;font-size:9px;color:var(--txt3)">(${s.u4} under $4)</span></span>
+          <span style="font-size:11px;font-weight:700;color:#16a34a">${(relRate*100).toFixed(0)}% <span style="font-weight:400;font-size:9px;color:var(--txt3)">(${s2.u4} under $4)</span></span>
         </div>
         <div style="height:6px;background:var(--surf3);border-radius:3px;overflow:hidden">
           <div style="width:${relW}%;height:100%;background:#16a34a;border-radius:3px"></div>
