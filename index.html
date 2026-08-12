@@ -740,7 +740,7 @@ tbody tr:last-child td{border-bottom:none}
       <span id="hr-detail-title" style="font-size:13px;font-weight:700"></span>
       <span id="hr-detail-sub" style="font-size:11px;color:var(--txt3)"></span>
     </div>
-    <div style="overflow-x:auto;border:1px solid #e0e0e0;border-radius:8px">
+    <div style="overflow-x:auto;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
       <table style="width:100%;border-collapse:collapse;font-size:10px">
         <thead id="hr-thead"></thead>
         <tbody id="hr-tbody"></tbody>
@@ -755,7 +755,7 @@ tbody tr:last-child td{border-bottom:none}
     <div id="hr-detail-body"></div>
   </div>
 </div>
-<div id="hr-cr-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;display:none;align-items:center;justify-content:center" onclick="if(event.target===this)hrCloseCrModal()">
+<div id="hr-cr-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)hrCloseCrModal()">
   <div id="hr-cr-modal" style="background:var(--surf);border-radius:12px;padding:18px 22px;max-width:600px;max-height:70vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,.2);min-width:380px">
     <div id="hr-cr-title" style="font-size:13px;font-weight:700;margin-bottom:4px"></div>
     <div id="hr-cr-sub" style="font-size:11px;color:var(--txt3);margin-bottom:10px"></div>
@@ -2389,30 +2389,38 @@ function hrRender(){
   document.getElementById('hr-summary-section').innerHTML=sumHtml;
   document.getElementById('hr-detail-title').textContent=(isCpi?'CPI':'Avg CTR×CTI')+' Distribution — Writer × Week';
   document.getElementById('hr-detail-sub').textContent=isCpi?'Cracking hit rate':'CTR×CTI hit rate (avg of CTR*CTI & CTRxCTI)';
-  document.getElementById('hr-thead').innerHTML=`<tr><th class="thl" style="min-width:90px">Writer</th><th class="thl" style="min-width:80px">Week</th><th class="thc" style="min-width:40px">N</th>${labels.map(l=>`<th>${l}</th>`).join('')}<th class="hit-col">Hit</th></tr>`;
+  document.getElementById('hr-thead').innerHTML=`<tr style="background:#f1f5f9;border-bottom:2px solid #64748b"><th style="text-align:center;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#334155;font-weight:700;min-width:90px">Writer</th><th style="text-align:center;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#334155;font-weight:700;min-width:80px">Week</th><th style="text-align:center;padding:8px 6px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#334155;font-weight:700;min-width:40px">N</th>${labels.map(l=>`<th style="text-align:center;padding:8px 6px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#334155;font-weight:700">${l}</th>`).join('')}<th style="text-align:center;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#14532d;font-weight:700;background:#f0fdf4;min-width:70px">Hit</th></tr>`;
   function hrBktCells(bkts,n,writerName,weekName){
     return bkts.map((v,i)=>{
       if(!n)return'<td class="empty-cell">&ndash;</td>';
       const pct=n>0?Math.round(v/n*100):0;
-      if(v===0)return`<td style="color:#e5e7eb;text-align:center">&ndash;</td>`;
-      var wB=btoa(unescape(encodeURIComponent(writerName||"")));return`<td class="${heat[i]}" style="text-align:center;cursor:pointer" onclick="hrShowWeekBucket(decodeURIComponent(escape(atob('${wB}'))),'${weekName||""}',${i})">${v}<span style="font-size:9px;color:var(--txt3);margin-left:2px">${pct}%</span></td>`;
+      if(v===0)return`<td style="color:#cbd5e1;text-align:center;vertical-align:middle;padding:6px 4px">&ndash;</td>`;
+      var wB=btoa(unescape(encodeURIComponent(writerName||"")));return`<td class="${heat[i]}" style="text-align:center;cursor:pointer;vertical-align:middle;padding:6px 4px" onclick="hrShowWeekBucket(decodeURIComponent(escape(atob('${wB}'))),'${weekName||""}',${i})">${v}<span style="font-size:9px;color:var(--txt3);margin-left:2px">${pct}%</span></td>`;
     }).join('');
   }
   let rows='';
+  var wIdx=0;
+  var wrColors=['#f8fafc','#ffffff'];
   writers.forEach(w=>{
     const wd=sd.writers[w];
     let firstRow=true;
     const activeWks=weeks.filter(wk=>wd.by_week[wk]&&wd.by_week[wk].total>0);
-    activeWks.forEach(wk=>{
+    if(!activeWks.length){wIdx++;return;}
+    var bg=wrColors[wIdx%2];
+    activeWks.forEach((wk,ri)=>{
       const wkd=wd.by_week[wk];
       const bkts=isCpi?wkd.cpi_bkt:wkd.ctr_bkt;
       const n=isCpi?wkd.cpi_n:wkd.ctr_n;
       const hit=isCpi?wkd.cpi_hit:wkd.ctr_hit;
       const hitPct=n>0?Math.round(hit/n*100):0;
-      const wCell=firstRow?`<td class="tdw" rowspan="${activeWks.length}">${w}</td>`:'';
+      var topBdr=firstRow?'border-top:2px solid #64748b;':'';
+      var wCol=HR_WRITER_COLORS[w]||'#475467';
+      const wCell=firstRow?`<td style="font-weight:800;font-size:12px;color:${wCol};padding:8px 12px;vertical-align:middle;text-align:center;border-left:3px solid ${wCol};background:${bg}" rowspan="${activeWks.length}">${w}</td>`:'';
       firstRow=false;
-      rows+=`<tr>${wCell}<td class="tdwk">${wk}</td><td class="tdn">${wkd.total}</td>${hrBktCells(bkts,n,w,wk)}<td class="hit-col ${hit>0?'hit-pos':'hit-zero'}">${hit} <span style="font-size:9px">(${hitPct}%)</span></td></tr>`;
+      var hitStyle=hit>0?'background:#dcfce7;color:#14532d;font-weight:700':'color:var(--txt3)';
+      rows+=`<tr style="background:${bg};${topBdr}border-bottom:1px solid #e2e8f0;">${wCell}<td style="padding:6px 10px;font-size:11px;color:var(--txt2);vertical-align:middle;text-align:center">${wk}</td><td style="padding:6px 8px;text-align:center;font-weight:700;font-size:12px;vertical-align:middle">${wkd.total}</td>${hrBktCells(bkts,n,w,wk)}<td style="text-align:center;padding:6px 10px;vertical-align:middle;${hitStyle}">${hit} <span style="font-size:9px">(${hitPct}%)</span></td></tr>`;
     });
+    wIdx++;
   });
   document.getElementById('hr-tbody').innerHTML=rows;
 }
@@ -2451,7 +2459,7 @@ function hrOpenHitModal(el){
   hrShowModal((mode==='cpi'?'Cracking assets':'Top CTR×CTI assets')+' · '+(month==='may'?'May 2026':'Jun 2026'),`${w} · ${assets.length} asset${assets.length>1?'s':''}`,assets);
 }
 
-function hrCloseCrModal(){document.getElementById('hr-cr-overlay').classList.remove('open');}
+function hrCloseCrModal(){var o=document.getElementById('hr-cr-overlay');if(o)o.style.display='none';}
 hrRender();
 
 function hrCloseDetail(){
